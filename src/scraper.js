@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 export const TARGET_URL = 'https://www.lasillavacia.com/resultados-preconteo-elecciones-2026/';
 
 export async function scrapeResultados(url = TARGET_URL) {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
