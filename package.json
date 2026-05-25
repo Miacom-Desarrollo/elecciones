@@ -1,0 +1,16 @@
+{
+  "name": "elecciones-scraper",
+  "version": "1.0.0",
+  "description": "Web scraper de resultados preconteo elecciones 2026 - La Silla Vacía",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "install:browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "playwright": "^1.47.0"
+  }
+}
