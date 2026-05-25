@@ -26,7 +26,8 @@ export async function scrapeResultados(url = TARGET_URL) {
     }
   });
 
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(4000);
 
   const title = await page.title();
@@ -44,28 +45,24 @@ export async function scrapeResultados(url = TARGET_URL) {
 }
 
 async function extractFromPage(page) {
-  const data = {};
+  const result = await page.evaluate(() => {
+    const data = {};
 
-  // Tables
-  const tables = await page.evaluate(() => {
-    return [...document.querySelectorAll('table')].map((table) => {
+    // Tables
+    const tables = [...document.querySelectorAll('table')].map((table) => {
       return [...table.querySelectorAll('tr')].map((tr) =>
         [...tr.querySelectorAll('th, td')].map((td) => td.innerText.trim())
       ).filter((row) => row.length > 0);
     }).filter((t) => t.length > 0);
-  });
-  if (tables.length) data.tablas = tables;
+    if (tables.length) data.tablas = tables;
 
-  // JSON-LD / embedded JSON scripts
-  const jsonLd = await page.evaluate(() => {
-    return [...document.querySelectorAll('script[type="application/json"], script[type="application/ld+json"]')]
+    // JSON-LD / embedded JSON scripts
+    const jsonLd = [...document.querySelectorAll('script[type="application/json"], script[type="application/ld+json"]')]
       .map((s) => { try { return JSON.parse(s.textContent); } catch { return null; } })
       .filter(Boolean);
-  });
-  if (jsonLd.length) data.json_ld = jsonLd;
+    if (jsonLd.length) data.json_ld = jsonLd;
 
-  // Window globals (__NEXT_DATA__, __INITIAL_STATE__, etc.)
-  const globals = await page.evaluate(() => {
+    // Window globals
     const keys = ['__INITIAL_STATE__', '__REDUX_STATE__', '__APP_STATE__', '__DATA__', '__NEXT_DATA__'];
     const found = {};
     for (const k of keys) {
@@ -77,41 +74,32 @@ async function extractFromPage(page) {
         }
       }
     }
-    return Object.keys(found).length ? found : null;
-  });
-  if (globals) data.window_globals = globals;
+    if (Object.keys(found).length) data.window_globals = found;
 
-  // Elements matching election-result class patterns
-  const elementos = await page.evaluate(() => {
+    // Elements matching election-result class patterns
     const selectors = [
       '[class*="candidat"]', '[class*="resultado"]', '[class*="candidate"]',
       '[class*="result"]', '[class*="partido"]', '[class*="voto"]',
       '[class*="vote"]', '[class*="percent"]', '[class*="porcent"]',
     ];
     const seen = new Set();
-    const results = [];
+    const elementos = [];
     selectors.forEach((sel) => {
       document.querySelectorAll(sel).forEach((el) => {
         if (!seen.has(el)) {
           seen.add(el);
-          results.push({
-            tag: el.tagName,
-            clases: el.className,
-            texto: el.innerText.trim().substring(0, 500),
-          });
+          elementos.push({ tag: el.tagName, clases: el.className, texto: el.innerText.trim().substring(0, 500) });
         }
       });
     });
-    return results;
-  });
-  if (elementos.length) data.elementos_resultados = elementos;
+    if (elementos.length) data.elementos_resultados = elementos;
 
-  // Main visible text
-  const textoPrincipal = await page.evaluate(() => {
+    // Main visible text
     const el = document.querySelector('main, article, #content, .content, [class*="content"], [class*="main"]');
-    return (el ?? document.body).innerText.trim().substring(0, 8000);
-  });
-  data.texto_principal = textoPrincipal;
+    data.texto_principal = (el ?? document.body).innerText.trim().substring(0, 8000);
 
-  return data;
+    return data;
+  });
+
+  return result;
 }
